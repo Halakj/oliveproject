@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "730030373422",
+    "project_id": "olive-land",
+    "storage_bucket": "olive-land.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:730030373422:android:ad460d760b42c8c14d3dbf",
+        "android_client_info": {
+          "package_name": "com.example.oliveproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAuuETJuzaEcftPIrc_A9K3MneK3FAxv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
