@@ -1,16 +1,28 @@
 # oliveproject
 
-A new Flutter project.
+An intelligent system for olive land leasing and Prunning olive tree branch.
 
 ## Getting Started
 
 This project is a starting point for a Flutter application.
+## About the Project
+This graduation project connects land owners with farmers through a mobile application.  
+It also integrates a smart hardware system for analyzing olive branches using image processing and machine learning.
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### Main Features
+- Landowners can post their olive lands for leasing.
+- Farmers can browse, request, and manage land leases.
+- Real-time notifications and communication between landowners and farmers.
+- Smart pruning system:
+  - Raspberry Pi + Pi Camera captures olive branch images.
+  - CNN model analyzes the image.
+  - App shows pruning recommendations (whether pruning is needed or not).
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+##  Tech Stack
+- Flutter (Dart) for mobile application.
+- Firebase for authentication, database, and notifications.
+- Raspberry Pi 4 with Pi Camera for hardware integration.
+- Convolutional Neural Network (CNN) for olive pruning analysis.
+
+
