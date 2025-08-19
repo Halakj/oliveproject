@@ -1,4 +1,6 @@
 flutter/ephemeral/
+assets/service-account.json
+
 
 # Visual Studio user-specific files.
 *.suo

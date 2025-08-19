@@ -9,11 +9,15 @@ import 'dart:convert';
 import 'profile_page.dart';
 import 'create_post_page.dart';
 import 'login_page.dart';
+import 'user_notifications_page.dart'; // ✅ إضافة import للصفحة الجديدة
 
-//======================================================================
-// الصفحة الرئيسية (HomePage)
-//======================================================================
+// ✅ تعديل HomePage لتقبل openPostId parameter
 class HomePage extends StatefulWidget {
+  final String? openPostId; // ✅ إضافة المعامل الجديد
+
+  const HomePage({Key? key, this.openPostId})
+      : super(key: key); // ✅ تعديل الـ constructor
+
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -41,6 +45,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ✅ دالة للتحقق من وجود إشعارات غير مقروءة
+  Stream<int> _getUnreadNotificationsCount() {
+    if (currentUser == null) {
+      return Stream.value(0);
+    }
+
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('receiverId', isEqualTo: currentUser!.uid)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -61,22 +79,100 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(shape: BoxShape.circle),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/olive_tree.jpg',
-                      fit: BoxFit.cover,
-                      errorBuilder: (c, e, s) =>
-                          Icon(Icons.eco, color: Colors.white, size: 30),
+                // ✅ إضافة صف يحتوي على الأيقونة والإشعارات
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // مساحة فارغة للتوازن
+                    SizedBox(width: 48),
+                    // الأيقونة الرئيسية والنص
+                    Column(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(shape: BoxShape.circle),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/olive_tree.jpg',
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => Icon(Icons.eco,
+                                  color: Colors.white, size: 30),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Home Page',
+                            style: TextStyle(color: Colors.white, fontSize: 16))
+                      ],
                     ),
-                  ),
+                    // ✅ أيقونة الإشعارات مع العداد
+                    StreamBuilder<int>(
+                      stream: _getUnreadNotificationsCount(),
+                      builder: (context, snapshot) {
+                        final unreadCount = snapshot.data ?? 0;
+
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UserNotificationsPage(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            margin: EdgeInsets.only(right: 16),
+                            child: Stack(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.notifications,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                ),
+                                // ✅ عرض العداد إذا كان هناك إشعارات غير مقروءة
+                                if (unreadCount > 0)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      padding: EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      constraints: BoxConstraints(
+                                        minWidth: 20,
+                                        minHeight: 20,
+                                      ),
+                                      child: Text(
+                                        unreadCount > 99
+                                            ? '99+'
+                                            : unreadCount.toString(),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text('Home Page',
-                    style: TextStyle(color: Colors.white, fontSize: 16))
               ],
             ),
           ),
@@ -112,6 +208,8 @@ class _HomePageState extends State<HomePage> {
                       post: post,
                       postId: postId,
                       currentUser: currentUser,
+                      // ✅ تمرير معلومة ما إذا كان هذا البوست يجب فتح الكومنتات له
+                      openComments: postId == widget.openPostId,
                     );
                   },
                 );
@@ -129,6 +227,55 @@ class _HomePageState extends State<HomePage> {
             IconButton(
               icon: Icon(Icons.home, color: oliveGreen),
               onPressed: () {},
+            ),
+            // ✅ إضافة أيقونة الإشعارات في الشريط السفلي أيضاً (اختياري)
+            StreamBuilder<int>(
+              stream: _getUnreadNotificationsCount(),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
+
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon:
+                          Icon(Icons.notifications_outlined, color: oliveGreen),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserNotificationsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          constraints: BoxConstraints(
+                            minWidth: 12,
+                            minHeight: 12,
+                          ),
+                          child: Text(
+                            unreadCount > 9 ? '9+' : unreadCount.toString(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
             IconButton(
               icon: Icon(Icons.person_outline, color: oliveGreen),
@@ -166,19 +313,19 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-//======================================================================
-// الـ Widget الخاص بالمنشور الواحد (PostWidget)
-//======================================================================
+// باقي الكود يبقى كما هو...
 class PostWidget extends StatefulWidget {
   final Map<String, dynamic> post;
   final String postId;
   final User? currentUser;
+  final bool openComments; // ✅ إضافة المعامل الجديد
 
   const PostWidget({
     Key? key,
     required this.post,
     required this.postId,
     required this.currentUser,
+    this.openComments = false, // ✅ القيمة الافتراضية false
   }) : super(key: key);
 
   @override
@@ -190,10 +337,16 @@ class _PostWidgetState extends State<PostWidget> {
   late final TextEditingController _commentController;
   bool _showComments = false;
 
+  DocumentReference? _editingCommentRef;
+  // ✅ المتغير الجديد لتخزين UID صاحب التعليق اللي بنرد عليه
+  String? _replyToUserId;
+
   @override
   void initState() {
     super.initState();
     _commentController = TextEditingController();
+    // ✅ إذا كان openComments = true، افتح الكومنتات مباشرة
+    _showComments = widget.openComments;
   }
 
   @override
@@ -284,26 +437,76 @@ class _PostWidgetState extends State<PostWidget> {
     );
   }
 
+  // ✅ تعديل sendCommentNotification لإرسال إشعارين عند الحاجة
   Future<void> _sendCommentNotification(String commenterName) async {
     if (widget.currentUser == null) return;
 
     final postData = widget.post;
-    final ownerId = postData['ownerId'];
+    final postOwnerId = postData['ownerId'];
+    final commenterId = widget.currentUser!.uid;
 
-    if (ownerId == widget.currentUser!.uid) return;
+    // إشعار لصاحب البوست
+    if (postOwnerId != commenterId && postOwnerId != _replyToUserId) {
+      final ownerDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(postOwnerId)
+          .get();
+      final fcmToken = ownerDoc.data()?['fcmToken'];
 
-    final ownerDoc =
-        await FirebaseFirestore.instance.collection('users').doc(ownerId).get();
-    final fcmToken = ownerDoc.data()?['fcmToken'];
+      if (fcmToken != null) {
+        await sendPushNotification(
+          fcmToken: fcmToken,
+          title: 'New Comment',
+          body: '$commenterName commented on your post',
+          data: {'postId': widget.postId, 'type': 'comment'},
+        );
 
-    if (fcmToken != null) {
-      await sendPushNotification(
-        fcmToken: fcmToken,
-        title: 'New Comment',
-        body: '$commenterName commented on your post',
-        data: {'postId': widget.postId, 'type': 'comment'},
-      );
+        // ✅ حفظ الإشعار في قاعدة البيانات
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'receiverId': postOwnerId,
+          'senderId': commenterId,
+          'title': 'New Comment',
+          'body': '$commenterName commented on your post',
+          'postId': widget.postId,
+          'type': 'comment',
+          'timestamp': DateTime.now(),
+          'isRead': false,
+        });
+      }
     }
+
+    // إشعار لصاحب التعليق (الرد)
+    if (_replyToUserId != null && _replyToUserId != commenterId) {
+      final replyUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_replyToUserId!)
+          .get();
+      final fcmToken = replyUserDoc.data()?['fcmToken'];
+
+      if (fcmToken != null) {
+        await sendPushNotification(
+          fcmToken: fcmToken,
+          title: 'New Reply',
+          body: '$commenterName replied to your comment',
+          data: {'postId': widget.postId, 'type': 'reply'},
+        );
+
+        // ✅ حفظ الإشعار في قاعدة البيانات
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'receiverId': _replyToUserId!,
+          'senderId': commenterId,
+          'title': 'New Reply',
+          'body': '$commenterName replied to your comment',
+          'postId': widget.postId,
+          'type': 'reply',
+          'timestamp': DateTime.now(),
+          'isRead': false,
+        });
+      }
+    }
+
+    // تنظيف
+    _replyToUserId = null;
   }
 
   Widget _buildComments() {
@@ -334,91 +537,127 @@ class _PostWidgetState extends State<PostWidget> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.black54, width: 0.8),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              if (commentUserId == null) return;
-                              final bool isCurrentUser =
-                                  widget.currentUser?.uid == commentUserId;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProfilePage(
-                                    userId: commentUserId,
-                                    isViewOnly: !isCurrentUser,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  if (commentUserId == null) return;
+                                  final bool isCurrentUser =
+                                      widget.currentUser?.uid == commentUserId;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProfilePage(
+                                        userId: commentUserId,
+                                        isViewOnly: !isCurrentUser,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  data['userName'] ?? 'User',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: oliveGreen,
+                                    decoration: TextDecoration.underline,
                                   ),
                                 ),
-                              );
-                            },
-                            child: Text(
-                              data['userName'] ?? 'User',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: oliveGreen,
-                                decoration: TextDecoration.underline,
                               ),
-                            ),
+                              SizedBox(height: 4),
+                              Text(data['text'] ?? ''),
+                            ],
                           ),
-                          SizedBox(height: 4),
-                          Text(data['text'] ?? ''),
-                        ],
-                      ),
-                    ),
-                    // --- START OF MODIFICATION ---
-                    if (isCommentOwner)
-                      PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert, size: 20),
-                        onSelected: (value) {
-                          if (value == 'delete') {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext dialogContext) {
-                                return AlertDialog(
-                                  title: Text("Confirm Deletion"),
-                                  content: Text(
-                                      "Are you sure you want to delete this comment?"),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(dialogContext).pop(),
-                                      child: Text("Cancel",
-                                          style: TextStyle(color: oliveGreen)),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.of(dialogContext).pop();
-                                        await doc.reference.delete();
-                                      },
-                                      child: Text("Delete",
-                                          style: TextStyle(color: Colors.red)),
-                                    ),
-                                  ],
+                        ),
+                        if (isCommentOwner)
+                          PopupMenuButton<String>(
+                            icon: Icon(Icons.more_vert, size: 20),
+                            onSelected: (value) {
+                              if (value == 'delete') {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext dialogContext) {
+                                    return AlertDialog(
+                                      title: Text("Confirm Deletion"),
+                                      content: Text(
+                                          "Are you sure you want to delete this comment?"),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(dialogContext).pop(),
+                                          child: Text("Cancel",
+                                              style:
+                                                  TextStyle(color: oliveGreen)),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            Navigator.of(dialogContext).pop();
+                                            await doc.reference.delete();
+                                          },
+                                          child: Text("Delete",
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 );
-                              },
-                            );
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete',
-                                    style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    // --- END OF MODIFICATION ---
+                              } else if (value == 'edit') {
+                                // ✅ إضافة وظيفة التعديل
+                                setState(() {
+                                  _commentController.text = data['text'];
+                                  _editingCommentRef = doc.reference;
+                                  _showComments = true;
+                                });
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              // ✅ إضافة خيار Edit
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, color: oliveGreen),
+                                    SizedBox(width: 8),
+                                    Text('Edit',
+                                        style: TextStyle(color: oliveGreen)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Delete',
+                                        style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    // ✅ عند الضغط على "Reply" (داخل comments.map)
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _commentController.text = '@${data['userName']} ';
+                          _replyToUserId = data['userId'];
+                          _showComments = true;
+                        });
+                      },
+                      child: Text('Reply', style: TextStyle(color: oliveGreen)),
+                    ),
                   ],
                 ),
               );
@@ -457,24 +696,36 @@ class _PostWidgetState extends State<PostWidget> {
                             .get();
                         final userName = userDoc['name'] ?? 'User';
 
-                        final commentData = {
-                          'text': text,
-                          'userId': user.uid,
-                          'userName': userName,
-                          'timestamp': DateTime.now(),
-                        };
+                        if (_editingCommentRef != null) {
+                          // تعديل التعليق
+                          await _editingCommentRef!.update({'text': text});
+                          _editingCommentRef = null;
+                        } else {
+                          // إضافة تعليق جديد
+                          final commentData = {
+                            'text': text,
+                            'userId': user.uid,
+                            'userName': userName,
+                            'timestamp': DateTime.now(),
+                          };
 
-                        await FirebaseFirestore.instance
-                            .collection('posts')
-                            .doc(widget.postId)
-                            .collection('comments')
-                            .add(commentData);
+                          await FirebaseFirestore.instance
+                              .collection('posts')
+                              .doc(widget.postId)
+                              .collection('comments')
+                              .add(commentData);
 
-                        await _sendCommentNotification(userName);
+                          await _sendCommentNotification(userName);
+                        }
+
+                        // ✅ بعد إرسال التعليق أو التحديث (ضمن onPressed)
                         _commentController.clear();
+                        _replyToUserId = null;
                         FocusScope.of(context).unfocus();
+                        setState(() {});
                       },
-                      child: Text("Post"),
+                      child:
+                          Text(_editingCommentRef != null ? "Update" : "Post"),
                     ),
                   ),
                 ],

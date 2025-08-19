@@ -27,7 +27,7 @@ class _CaptureImagePageState extends State<CaptureImagePage> {
     });
 
     try {
-      final raspberryIp = '10.79.219.237'; // ← غيّرها إذا لزم
+      final raspberryIp = '10.79.219.237';
       final uid = user.uid;
       final uri =
           Uri.parse('http://$raspberryIp:5000/capture_annotated?uid=$uid');

@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'dart:convert';
 import 'homepage.dart';
 import 'create_post_page.dart';
 import 'login_page.dart';
 import 'capture_image.dart';
+import 'add_guarantee_page.dart';
+import 'view_guarantees_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-//======================================================================
-// 1. الويدجت الرئيسية لصفحة الملف الشخصي (ProfilePage)
-//======================================================================
+import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'add_managed_land_page.dart';
+import 'view_managed_lands_page.dart';
+
 class ProfilePage extends StatefulWidget {
   final User? user;
   final String? userId;
@@ -247,79 +249,157 @@ class _ProfilePageState extends State<ProfilePage> {
             userType == 'landOwner' ? 'Land Owner' : 'Farmer';
         final profileImage = userData['profileImage'] ??
             'https://www.gravatar.com/avatar/placeholder?s=200&d=mp';
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F5),
-          body: SafeArea(
-            child: ListView(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: oliveGreen,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(20),
+
+        // Get current user's type for visibility control
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser?.uid)
+              .get(),
+          builder: (context, currentUserSnapshot) {
+            String currentUserType = 'farmer'; // default
+            if (currentUserSnapshot.hasData &&
+                currentUserSnapshot.data!.exists) {
+              final currentUserData =
+                  currentUserSnapshot.data!.data() as Map<String, dynamic>? ??
+                      {};
+              currentUserType = currentUserData['userType'] ?? 'farmer';
+            }
+
+            return Scaffold(
+              backgroundColor: const Color(0xFFF5F5F5),
+              body: SafeArea(
+                child: ListView(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: oliveGreen,
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(20),
+                          bottomRight: Radius.circular(20),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: _buildProfileHeader(
+                          userName, userTypeFormatted, profileImage),
                     ),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: _buildProfileHeader(
-                      userName, userTypeFormatted, profileImage),
+                    const SizedBox(height: 16),
+                    if (userType == 'landOwner') ...[
+                      // Only show "View All Guarantees" button if current user is landOwner
+                      if (currentUserType == 'landOwner')
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ViewGuaranteesPage(),
+                                ),
+                              );
+                            },
+                            icon: Icon(Icons.assignment, color: Colors.white),
+                            label: Text(
+                              'View All Guarantees',
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 16),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: oliveGreen,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      _buildOwnerPosts(currentUserType),
+                    ] else ...[
+                      _buildEditableSection(
+                        'Experience',
+                        experience,
+                        editingExperience && !widget.isViewOnly,
+                        experienceController,
+                        (val) {
+                          if (!widget.isViewOnly) {
+                            setState(() {
+                              experience = val;
+                              editingExperience = false;
+                            });
+                            _saveFarmerData();
+                          }
+                        },
+                        () {
+                          if (!widget.isViewOnly) {
+                            setState(() {
+                              editingExperience = true;
+                              experienceController.text = experience;
+                            });
+                          }
+                        },
+                      ),
+                      _buildEditableSection(
+                        'Skills',
+                        skills,
+                        editingSkills && !widget.isViewOnly,
+                        skillsController,
+                        (val) {
+                          if (!widget.isViewOnly) {
+                            setState(() {
+                              skills = val;
+                              editingSkills = false;
+                            });
+                            _saveFarmerData();
+                          }
+                        },
+                        () {
+                          if (!widget.isViewOnly) {
+                            setState(() {
+                              editingSkills = true;
+                              skillsController.text = skills;
+                            });
+                          }
+                        },
+                      ),
+                      // Add "View Managed Lands" button for farmers only
+                      if (!widget.isViewOnly)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ViewManagedLandsPage(),
+                                ),
+                              );
+                            },
+                            icon: Icon(Icons.landscape, color: Colors.white),
+                            label: Text(
+                              'View Managed Lands',
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 16),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: oliveGreen,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 16),
-                if (userType == 'landOwner')
-                  _buildOwnerPosts()
-                else ...[
-                  _buildEditableSection(
-                    'Experience',
-                    experience,
-                    editingExperience && !widget.isViewOnly,
-                    experienceController,
-                    (val) {
-                      if (!widget.isViewOnly) {
-                        setState(() {
-                          experience = val;
-                          editingExperience = false;
-                        });
-                        _saveFarmerData();
-                      }
-                    },
-                    () {
-                      if (!widget.isViewOnly) {
-                        setState(() {
-                          editingExperience = true;
-                          experienceController.text = experience;
-                        });
-                      }
-                    },
-                  ),
-                  _buildEditableSection(
-                    'Skills',
-                    skills,
-                    editingSkills && !widget.isViewOnly,
-                    skillsController,
-                    (val) {
-                      if (!widget.isViewOnly) {
-                        setState(() {
-                          skills = val;
-                          editingSkills = false;
-                        });
-                        _saveFarmerData();
-                      }
-                    },
-                    () {
-                      if (!widget.isViewOnly) {
-                        setState(() {
-                          editingSkills = true;
-                          skillsController.text = skills;
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-          bottomNavigationBar:
-              widget.isViewOnly ? null : _buildBottomNav(userType),
+              ),
+              bottomNavigationBar: widget.isViewOnly
+                  ? null
+                  : _buildBottomNav(userType, currentUserType),
+            );
+          },
         );
       },
     );
@@ -364,7 +444,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildBottomNav(String userType) {
+  Widget _buildBottomNav(String userType, String currentUserType) {
     return Container(
       color: Colors.transparent,
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -390,8 +470,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
               },
             ),
+            // Only show View Guarantees icon if current user is landOwner
+            if (currentUserType == 'landOwner')
+              IconButton(
+                icon: Icon(Icons.assignment_outlined, color: oliveGreen),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ViewGuaranteesPage()),
+                  );
+                },
+              ),
           ],
-          if (userType == 'farmer')
+          if (userType == 'farmer') ...[
             IconButton(
               icon: Icon(Icons.camera_alt_outlined, color: oliveGreen),
               onPressed: () {
@@ -401,6 +492,17 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
               },
             ),
+            if (!widget.isViewOnly)
+              IconButton(
+                icon: Icon(Icons.add_location_alt_outlined, color: oliveGreen),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AddManagedLandPage()),
+                  );
+                },
+              ),
+          ],
           IconButton(
             icon: Icon(Icons.person_outline, color: oliveGreen),
             onPressed: () {
@@ -430,7 +532,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildOwnerPosts() {
+  Widget _buildOwnerPosts(String currentUserType) {
     final uid = widget.userId ?? currentUser!.uid;
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -462,6 +564,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 postId: postId,
                 postData: post,
                 currentUser: currentUser!,
+                currentUserType: currentUserType,
               ),
             );
           },
@@ -471,19 +574,18 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-//======================================================================
-// 2. الويدجت المستقلة للمنشور الواحد (OwnerPostCard)
-//======================================================================
 class OwnerPostCard extends StatefulWidget {
   final String postId;
   final Map<String, dynamic> postData;
   final User currentUser;
+  final String currentUserType;
 
   const OwnerPostCard({
     Key? key,
     required this.postId,
     required this.postData,
     required this.currentUser,
+    required this.currentUserType,
   }) : super(key: key);
 
   @override
@@ -493,6 +595,22 @@ class OwnerPostCard extends StatefulWidget {
 class _OwnerPostCardState extends State<OwnerPostCard> {
   final Color oliveGreen = const Color(0xFF606C38);
   bool showComments = false;
+
+  late final TextEditingController _commentController;
+  DocumentReference? _editingCommentRef;
+  String? _replyToUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _commentController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
 
   Future<void> sendPushNotification({
     required String fcmToken,
@@ -573,100 +691,48 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
     );
   }
 
-  Widget _commentInputField(String postId) {
-    final controller = TextEditingController();
-    return Container(
-      margin: EdgeInsets.only(top: 12),
-      padding: EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: oliveGreen.withOpacity(0.5)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: 'Write your comment...'),
-          ),
-          SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.trim().isEmpty) return;
-              await _addCommentWithNotification(postId, controller.text.trim());
-              controller.clear();
-            },
-            child: Text("Post", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _sendCommentNotification(String commenterName) async {
+    if (widget.currentUser == null) return;
 
-  Future<void> _addCommentWithNotification(
-      String postId, String commentText) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-      final userDoc = await FirebaseFirestore.instance
+    final postData = widget.postData;
+    final postOwnerId = postData['ownerId'];
+    final commenterId = widget.currentUser.uid;
+
+    if (postOwnerId != commenterId && postOwnerId != _replyToUserId) {
+      final ownerDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid)
+          .doc(postOwnerId)
           .get();
-      final userName = userDoc['name'] ?? 'User';
-      final commentData = {
-        'text': commentText,
-        'userId': user.uid,
-        'userName': userName,
-        'timestamp': DateTime.now(),
-      };
+      final fcmToken = ownerDoc.data()?['fcmToken'];
 
-      await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(postId)
-          .collection('comments')
-          .add(commentData);
-
-      final postDoc = await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(postId)
-          .get();
-      if (postDoc.exists) {
-        final postData = postDoc.data()!;
-        if (postData['ownerId'] != user.uid) {
-          final notificationBody =
-              '$userName commented on your post: "$commentText"';
-          await FirebaseFirestore.instance.collection('notifications').add({
-            'receiverId': postData['ownerId'],
-            'senderId': user.uid,
-            'title': 'New Comment',
-            'body': notificationBody,
-            'timestamp': Timestamp.now(),
-            'postId': postId,
-            'isRead': false,
-          });
-          final ownerDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(postData['ownerId'])
-              .get();
-          final fcmToken = ownerDoc.data()?['fcmToken'];
-          if (fcmToken != null) {
-            await sendPushNotification(
-              fcmToken: fcmToken,
-              title: 'New Comment',
-              body: '$userName commented on your post',
-              data: {'postId': postId},
-            );
-          }
-        }
-      }
-    } catch (e) {
-      print('Error adding comment: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error adding comment. Please try again.")),
+      if (fcmToken != null) {
+        await sendPushNotification(
+          fcmToken: fcmToken,
+          title: 'New Comment',
+          body: '$commenterName commented on your post',
+          data: {'postId': widget.postId, 'type': 'comment'},
         );
       }
     }
+
+    if (_replyToUserId != null && _replyToUserId != commenterId) {
+      final replyUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_replyToUserId!)
+          .get();
+      final fcmToken = replyUserDoc.data()?['fcmToken'];
+
+      if (fcmToken != null) {
+        await sendPushNotification(
+          fcmToken: fcmToken,
+          title: 'New Reply',
+          body: '$commenterName replied to your comment',
+          data: {'postId': widget.postId, 'type': 'reply'},
+        );
+      }
+    }
+
+    _replyToUserId = null;
   }
 
   Widget _buildComments(String postId) {
@@ -680,9 +746,11 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return SizedBox();
         final comments = snapshot.data!.docs;
-        if (comments.isEmpty) {
-          return Column(
-            children: [
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (comments.isEmpty)
               Container(
                 padding: EdgeInsets.all(16),
                 child: Text(
@@ -693,18 +761,12 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
                   ),
                 ),
               ),
-              _commentInputField(
-                  postId), // Show input field even if no comments
-            ],
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
             ...comments.map((doc) {
               final data = doc.data() as Map<String, dynamic>;
+              final commentUserId = data['userId'];
               final bool isCommentOwner =
-                  (widget.currentUser.uid == data['userId']);
+                  (widget.currentUser.uid == commentUserId);
+
               return Container(
                 margin: EdgeInsets.symmetric(vertical: 6),
                 padding: EdgeInsets.all(10),
@@ -713,100 +775,196 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.black54, width: 0.8),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              final currentUid =
-                                  FirebaseAuth.instance.currentUser?.uid;
-                              final isCurrentUser =
-                                  data['userId'] == currentUid;
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  final currentUid =
+                                      FirebaseAuth.instance.currentUser?.uid;
+                                  final isCurrentUser =
+                                      data['userId'] == currentUid;
 
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProfilePage(
-                                    userId: data['userId'],
-                                    isViewOnly: !isCurrentUser,
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProfilePage(
+                                        userId: data['userId'],
+                                        isViewOnly: !isCurrentUser,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  data['userName'] ?? 'User',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: oliveGreen,
+                                    decoration: TextDecoration.underline,
                                   ),
                                 ),
-                              );
-                            },
-                            child: Text(
-                              data['userName'] ?? 'User',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: oliveGreen,
-                                  decoration: TextDecoration.underline),
-                            ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(data['text'] ?? ''),
+                            ],
                           ),
-                          Text(data['text'] ?? ''),
-                        ],
-                      ),
-                    ),
-                    if (isCommentOwner)
-                      PopupMenuButton<String>(
-                        onSelected: (value) async {
-                          if (value == 'delete') {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: Text("Confirm Deletion"),
-                                  content: Text(
-                                      "Are you sure you want to delete this comment?"),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: Text("Cancel"),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.of(context).pop();
-                                        await FirebaseFirestore.instance
-                                            .collection('posts')
-                                            .doc(postId)
-                                            .collection('comments')
-                                            .doc(doc.id)
-                                            .delete();
-                                      },
-                                      child: Text("Delete",
-                                          style: TextStyle(color: Colors.red)),
-                                    ),
-                                  ],
+                        ),
+                        if (isCommentOwner)
+                          PopupMenuButton<String>(
+                            icon: Icon(Icons.more_vert, size: 20),
+                            onSelected: (value) {
+                              if (value == 'delete') {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext dialogContext) {
+                                    return AlertDialog(
+                                      title: Text("Confirm Deletion"),
+                                      content: Text(
+                                          "Are you sure you want to delete this comment?"),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(dialogContext).pop(),
+                                          child: Text("Cancel",
+                                              style:
+                                                  TextStyle(color: oliveGreen)),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            Navigator.of(dialogContext).pop();
+                                            await doc.reference.delete();
+                                          },
+                                          child: Text("Delete",
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 );
-                              },
-                            );
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          // --- START OF MODIFICATION ---
-                          // Only the delete option is available now
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete',
-                                    style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
-                          ),
-                          // --- END OF MODIFICATION ---
-                        ],
-                      ),
+                              } else if (value == 'edit') {
+                                setState(() {
+                                  _commentController.text = data['text'];
+                                  _editingCommentRef = doc.reference;
+                                  showComments = true;
+                                });
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, color: oliveGreen),
+                                    SizedBox(width: 8),
+                                    Text('Edit',
+                                        style: TextStyle(color: oliveGreen)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Delete',
+                                        style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _commentController.text = '@${data['userName']} ';
+                          _replyToUserId = data['userId'];
+                          showComments = true;
+                        });
+                      },
+                      child: Text('Reply', style: TextStyle(color: oliveGreen)),
+                    ),
                   ],
                 ),
               );
             }).toList(),
-            _commentInputField(postId),
+            Container(
+              margin: EdgeInsets.only(top: 12),
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: oliveGreen.withOpacity(0.5)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _commentController,
+                    decoration:
+                        InputDecoration(hintText: 'Write your comment...'),
+                    maxLines: null,
+                  ),
+                  SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final text = _commentController.text.trim();
+                        if (text.isEmpty) return;
+
+                        final user = widget.currentUser;
+                        if (user == null) return;
+
+                        final userDoc = await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .get();
+                        final userName = userDoc['name'] ?? 'User';
+
+                        if (_editingCommentRef != null) {
+                          await _editingCommentRef!.update({'text': text});
+                          _editingCommentRef = null;
+                        } else {
+                          final commentData = {
+                            'text': text,
+                            'userId': user.uid,
+                            'userName': userName,
+                            'timestamp': DateTime.now(),
+                          };
+
+                          await FirebaseFirestore.instance
+                              .collection('posts')
+                              .doc(widget.postId)
+                              .collection('comments')
+                              .add(commentData);
+
+                          await _sendCommentNotification(userName);
+                        }
+
+                        _commentController.clear();
+                        _replyToUserId = null;
+                        FocusScope.of(context).unfocus();
+                        setState(() {});
+                      },
+                      child:
+                          Text(_editingCommentRef != null ? "Update" : "Post"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         );
       },
@@ -828,6 +986,7 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
         final userData =
             userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
         final userName = userData["name"] ?? "User";
+        final userType = userData["userType"] ?? "User";
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -984,7 +1143,7 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
                   style: TextStyle(fontSize: 14, color: oliveGreen)),
               const SizedBox(height: 12),
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GestureDetector(
                     onTap: () {
@@ -1008,6 +1167,41 @@ class _OwnerPostCardState extends State<OwnerPostCard> {
                       ],
                     ),
                   ),
+                  // Add Guarantee button - only shows for current landOwner users
+                  if (widget.currentUserType == 'landOwner')
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddGuaranteePage(
+                              postId: widget.postId,
+                              postLocation: widget.postData["location"] ?? "",
+                              postTitle: widget.postData["title"] ?? "",
+                            ),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color:
+                                  oliveGreen, // Changed from Colors.orange to oliveGreen
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.add_circle,
+                                color: Colors.white, size: 18),
+                          ),
+                          const SizedBox(width: 6),
+                          Text("Add Guarantee",
+                              style: TextStyle(
+                                  color:
+                                      oliveGreen)), // Changed from Colors.orange to oliveGreen
+                        ],
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),

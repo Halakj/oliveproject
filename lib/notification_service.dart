@@ -1,9 +1,8 @@
-// notification_service.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:convert';
-import 'profile_page.dart'; // تأكد من استيراد صفحة البروفايل
+import 'homepage.dart'; // ✅ التعديل المهم
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -16,9 +15,7 @@ class NotificationService {
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const InitializationSettings initializationSettings =
-        InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
+        InitializationSettings(android: initializationSettingsAndroid);
 
     await _flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
@@ -26,15 +23,9 @@ class NotificationService {
         if (response.payload != null) {
           final Map<String, dynamic> data = json.decode(response.payload!);
           if (data['postId'] != null) {
-            // استخدم navigatorKey للانتقال إلى صفحة البروفايل مع تحديد المنشور
             navigatorKey.currentState?.push(
               MaterialPageRoute(
-                builder: (context) => ProfilePage(
-                  // هنا يجب أن يكون لديك طريقة لتمرير postId إلى ProfilePage
-                  // قد تحتاج إلى تعديل ProfilePage لاستقبال postId والبحث عنه
-                  // هذا مثال مبسط
-                  postIdToNavigateTo: data['postId'],
-                ),
+                builder: (context) => HomePage(openPostId: data['postId']),
               ),
             );
           }
@@ -42,7 +33,6 @@ class NotificationService {
       },
     );
 
-    // التعامل مع الإشعارات عندما يكون التطبيق في المقدمة
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
@@ -54,8 +44,8 @@ class NotificationService {
           notification.body,
           NotificationDetails(
             android: AndroidNotificationDetails(
-              'high_importance_channel', // معرف القناة
-              'High Importance Notifications', // اسم القناة
+              'high_importance_channel',
+              'High Importance Notifications',
               channelDescription:
                   'This channel is used for important notifications.',
               importance: Importance.max,
@@ -63,19 +53,16 @@ class NotificationService {
               icon: '@mipmap/ic_launcher',
             ),
           ),
-          payload: json.encode(message.data), // تمرير البيانات الإضافية
+          payload: json.encode(message.data),
         );
       }
     });
 
-    // التعامل مع الإشعارات عند النقر عليها والتطبيق في الخلفية أو مغلق
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       if (message.data['postId'] != null) {
         navigatorKey.currentState?.push(
           MaterialPageRoute(
-            builder: (context) => ProfilePage(
-              postIdToNavigateTo: message.data['postId'],
-            ),
+            builder: (context) => HomePage(openPostId: message.data['postId']),
           ),
         );
       }
